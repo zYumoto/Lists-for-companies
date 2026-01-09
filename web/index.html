@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Empresa | Lists</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <div class="logo">E</div>
+      <div>
+        <div class="title">Empresa</div>
+        <div class="subtitle">Lista interna (tipo Lists)</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <input id="search" placeholder="Buscar..." />
+      <button id="refresh">Atualizar</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>Novo item</h2>
+      <div class="grid">
+        <label>
+          Título
+          <input id="title" placeholder="Ex: Follow-up com cliente" />
+        </label>
+        <label>
+          Status
+          <select id="status">
+            <option>New</option>
+            <option>In Progress</option>
+            <option>Done</option>
+            <option>Blocked</option>
+          </select>
+        </label>
+        <label>
+          Responsável
+          <input id="owner" placeholder="Ex: Victor" />
+        </label>
+        <div class="right">
+          <button id="create">Adicionar</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <h2>Inserção em lote (colar do Excel)</h2>
+        <button id="bulkSend">Enviar lote</button>
+      </div>
+      <p class="hint">
+        Cole linhas do Excel aqui (TAB/colunas). Formato:
+        <b>title</b> | <b>status</b> | <b>owner</b>
+      </p>
+      <textarea id="bulk" rows="6" placeholder="Ex:
+Item 1	New	Victor
+Item 2	In Progress	Ana"></textarea>
+      <div class="small" id="bulkPreview"></div>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <h2>Itens</h2>
+        <div class="small" id="count"></div>
+      </div>
+
+      <div class="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:70px;">ID</th>
+              <th>Título</th>
+              <th style="width:160px;">Status</th>
+              <th style="width:180px;">Responsável</th>
+              <th style="width:180px;">Atualizado</th>
+              <th style="width:140px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
