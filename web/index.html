@@ -17,74 +17,171 @@
     </div>
 
     <div class="actions">
-      <input id="search" placeholder="Buscar..." />
-      <button id="refresh">Atualizar</button>
+      <!-- Só aparece logado -->
+      <div id="userBox" class="userBox hidden">
+        <div class="userMeta">
+          <div class="userName" id="userName">—</div>
+          <div class="userEmail" id="userEmail">—</div>
+        </div>
+        <button id="logoutBtn" class="danger">Sair</button>
+      </div>
     </div>
   </header>
 
   <main class="wrap">
-    <section class="card">
-      <h2>Novo item</h2>
-      <div class="grid">
+
+    <!-- =========================
+         VIEW: LOGIN
+    ========================== -->
+    <section id="authView" class="card authCard">
+      <h2>Entrar</h2>
+      <p class="hint">Acesse com seu usuário admin.</p>
+
+      <div class="grid2">
         <label>
-          Título
-          <input id="title" placeholder="Ex: Follow-up com cliente" />
+          Email
+          <input id="loginEmail" placeholder="ex: victor.charleaux@msc.com" autocomplete="username" />
         </label>
+
         <label>
-          Status
-          <select id="status">
-            <option>New</option>
-            <option>In Progress</option>
-            <option>Done</option>
-            <option>Blocked</option>
-          </select>
+          Senha
+          <input id="loginPassword" type="password" placeholder="Sua senha" autocomplete="current-password" />
         </label>
-        <label>
-          Responsável
-          <input id="owner" placeholder="Ex: Victor" />
-        </label>
-        <div class="right">
-          <button id="create">Adicionar</button>
+
+        <div class="row right">
+          <button id="loginBtn" class="primary">Entrar</button>
         </div>
       </div>
+
+      <div id="authError" class="alert hidden"></div>
+
+      <div class="small">
+        Dica: no primeiro start da API, o Admin Master padrão é:<br/>
+        <b>victor.charleaux@msc.com</b> / <b>ChangeMe123!</b> (troque depois)
+      </div>
     </section>
 
-    <section class="card">
-      <div class="row">
-        <h2>Inserção em lote (colar do Excel)</h2>
-        <button id="bulkSend">Enviar lote</button>
-      </div>
-      <p class="hint">
-        Cole linhas do Excel aqui (TAB/colunas). Formato:
-        <b>title</b> | <b>status</b> | <b>owner</b>
-      </p>
-      <textarea id="bulk" rows="6" placeholder="Ex:
+    <!-- =========================
+         VIEW: APP (LOGADO)
+    ========================== -->
+    <section id="appView" class="hidden">
+
+      <!-- Top actions -->
+      <section class="card">
+        <div class="row">
+          <h2>Lista</h2>
+          <div class="actions">
+            <input id="search" placeholder="Buscar..." />
+            <button id="refresh">Atualizar</button>
+          </div>
+        </div>
+        <div class="small" id="count">—</div>
+      </section>
+
+      <!-- Novo Item -->
+      <section class="card">
+        <h2>Novo item</h2>
+        <div class="grid">
+          <label>
+            Título
+            <input id="title" placeholder="Ex: Follow-up com cliente" />
+          </label>
+
+          <label>
+            Status
+            <select id="status">
+              <option>New</option>
+              <option>In Progress</option>
+              <option>Done</option>
+              <option>Blocked</option>
+            </select>
+          </label>
+
+          <label>
+            Responsável
+            <input id="owner" placeholder="Ex: Victor" />
+          </label>
+
+          <div class="right">
+            <button id="create" class="primary">Adicionar</button>
+          </div>
+        </div>
+
+        <div id="appError" class="alert hidden"></div>
+      </section>
+
+      <!-- Lote -->
+      <section class="card">
+        <div class="row">
+          <h2>Inserção em lote (colar do Excel)</h2>
+          <button id="bulkSend" class="primary">Enviar lote</button>
+        </div>
+
+        <p class="hint">
+          Cole linhas do Excel aqui (TAB/colunas). Formato:
+          <b>title</b> | <b>status</b> | <b>owner</b>
+        </p>
+
+        <textarea id="bulk" rows="7" placeholder="Ex:
 Item 1	New	Victor
 Item 2	In Progress	Ana"></textarea>
-      <div class="small" id="bulkPreview"></div>
-    </section>
 
-    <section class="card">
-      <div class="row">
-        <h2>Itens</h2>
-        <div class="small" id="count"></div>
-      </div>
+        <div class="small" id="bulkPreview"></div>
+      </section>
 
-      <div class="tableWrap">
-        <table>
-          <thead>
-            <tr>
-              <th style="width:70px;">ID</th>
-              <th>Título</th>
-              <th style="width:160px;">Status</th>
-              <th style="width:180px;">Responsável</th>
-              <th style="width:180px;">Atualizado</th>
-              <th style="width:140px;">Ações</th>
-            </tr>
-          </thead>
-          <tbody id="tbody"></tbody>
-        </table>
-      </div>
+      <!-- Itens -->
+      <section class="card">
+        <div class="row">
+          <h2>Itens</h2>
+          <div class="small">Edite e clique em <b>Salvar</b>.</div>
+        </div>
+
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:70px;">ID</th>
+                <th>Título</th>
+                <th style="width:160px;">Status</th>
+                <th style="width:180px;">Responsável</th>
+                <th style="width:180px;">Atualizado</th>
+                <th style="width:140px;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Admin area (somente ADMIN) -->
+      <section id="adminPanel" class="card hidden">
+        <div class="row">
+          <h2>Admin: criar novo admin</h2>
+          <div class="small">Somente admins podem registrar.</div>
+        </div>
+
+        <div class="grid3">
+          <label>
+            Nome
+            <input id="regName" placeholder="Ex: Ana Souza" />
+          </label>
+          <label>
+            Email
+            <input id="regEmail" placeholder="ex: ana@empresa.com" />
+          </label>
+          <label>
+            Senha
+            <input id="regPassword" type="password" placeholder="Senha inicial" />
+          </label>
+
+          <div class="right">
+            <button id="regBtn" class="primary">Criar admin</button>
+          </div>
+        </div>
+
+        <div id="regResult" class="alert hidden"></div>
+      </section>
+
     </section>
   </main>
 

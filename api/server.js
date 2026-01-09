@@ -1,6 +1,9 @@
 import express from "express";
 import cors from "cors";
-import { initDb, run, all, get } from "./db.js";
+import bcrypt from "bcrypt";
+
+import { initDb, run, get, all } from "./db.js";
+import { signToken, authMiddleware, requireAdmin } from "./auth.js";
 
 const app = express();
 app.use(cors());
@@ -12,13 +15,125 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-// Health
+/* =========================
+   SEED ADMIN MASTER
+========================= */
+async function seedMaster() {
+  // ✅ Seu perfil como Admin Master
+  const email = "victor.charleaux@msc.com";
+  const name = "Victor";
+  const password = "ChangeMe123!"; // troque depois
+
+  const exists = await get(`SELECT id FROM users WHERE email = ?`, [email]);
+  if (exists) return;
+
+  const hash = await bcrypt.hash(password, 10);
+  const ts = nowIso();
+
+  await run(
+    `INSERT INTO users (email, name, password_hash, role, is_master, created_at, updated_at)
+     VALUES (?, ?, ?, 'ADMIN', 1, ?, ?)`,
+    [email, name, hash, ts, ts]
+  );
+
+  console.log("✅ Admin Master criado:");
+  console.log("   Email:", email);
+  console.log("   Senha:", password);
+}
+await seedMaster();
+
+/* =========================
+   HEALTH
+========================= */
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// List (com busca)
-app.get("/items", async (req, res) => {
+/* =========================
+   AUTH
+========================= */
+app.post("/auth/login", async (req, res) => {
   try {
-    const q = (req.query.q || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+
+    if (!email || !password) return res.status(400).json({ error: "email e senha são obrigatórios" });
+
+    const user = await get(`SELECT * FROM users WHERE email = ?`, [email]);
+    if (!user) return res.status(401).json({ error: "Credenciais inválidas" });
+
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) return res.status(401).json({ error: "Credenciais inválidas" });
+
+    const token = signToken(user);
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        is_master: !!user.is_master
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ✅ ROTA QUE O FRONT PRECISA
+app.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const user = await get(
+      `SELECT id, email, name, role, is_master, created_at, updated_at
+       FROM users WHERE id = ?`,
+      [req.user.sub]
+    );
+
+    if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
+    res.json(user);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ✅ Registrar novo admin (somente ADMIN logado)
+app.post("/auth/register", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const name = String(req.body?.name || "").trim();
+    const password = String(req.body?.password || "");
+
+    if (!email || !name || !password) {
+      return res.status(400).json({ error: "name, email e password são obrigatórios" });
+    }
+
+    const exists = await get(`SELECT id FROM users WHERE email = ?`, [email]);
+    if (exists) return res.status(409).json({ error: "Email já existe" });
+
+    const ts = nowIso();
+    const password_hash = await bcrypt.hash(password, 10);
+
+    await run(
+      `INSERT INTO users (email, name, password_hash, role, is_master, created_at, updated_at)
+       VALUES (?, ?, ?, 'ADMIN', 0, ?, ?)`,
+      [email, name, password_hash, ts, ts]
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+/* =========================
+   ITEMS (PROTEGIDO)
+========================= */
+
+// Listar (com busca ?q=)
+app.get("/items", authMiddleware, async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+
     const rows = q
       ? await all(
           `SELECT * FROM items
@@ -34,42 +149,46 @@ app.get("/items", async (req, res) => {
   }
 });
 
-// Create 1
-app.post("/items", async (req, res) => {
+// Criar 1
+app.post("/items", authMiddleware, async (req, res) => {
   try {
-    const { title, status = "New", owner = "" } = req.body || {};
-    if (!title || !String(title).trim()) return res.status(400).json({ error: "title is required" });
+    const title = String(req.body?.title || "").trim();
+    const status = String(req.body?.status || "New").trim();
+    const owner = String(req.body?.owner || "").trim();
+
+    if (!title) return res.status(400).json({ error: "title é obrigatório" });
 
     const ts = nowIso();
-    const r = await run(
+    await run(
       `INSERT INTO items (title, status, owner, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?)`,
-      [String(title).trim(), String(status).trim(), String(owner).trim(), ts, ts]
+      [title, status, owner, ts, ts]
     );
 
-    const created = await get(`SELECT * FROM items WHERE id = ?`, [r.lastID]);
-    res.json(created);
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
 });
 
-// Update 1
-app.put("/items/:id", async (req, res) => {
+// Atualizar 1 (Salvar)
+app.put("/items/:id", authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { title, status, owner } = req.body || {};
+    if (!id) return res.status(400).json({ error: "id inválido" });
 
     const existing = await get(`SELECT * FROM items WHERE id = ?`, [id]);
-    if (!existing) return res.status(404).json({ error: "not found" });
+    if (!existing) return res.status(404).json({ error: "Item não encontrado" });
 
-    const newTitle = title !== undefined ? String(title).trim() : existing.title;
-    const newStatus = status !== undefined ? String(status).trim() : existing.status;
-    const newOwner = owner !== undefined ? String(owner).trim() : existing.owner;
+    const title = req.body?.title !== undefined ? String(req.body.title).trim() : existing.title;
+    const status = req.body?.status !== undefined ? String(req.body.status).trim() : existing.status;
+    const owner = req.body?.owner !== undefined ? String(req.body.owner).trim() : (existing.owner || "");
+
+    if (!title) return res.status(400).json({ error: "title é obrigatório" });
 
     await run(
       `UPDATE items SET title=?, status=?, owner=?, updated_at=? WHERE id=?`,
-      [newTitle, newStatus, newOwner, nowIso(), id]
+      [title, status, owner, nowIso(), id]
     );
 
     const updated = await get(`SELECT * FROM items WHERE id = ?`, [id]);
@@ -79,10 +198,12 @@ app.put("/items/:id", async (req, res) => {
   }
 });
 
-// Delete 1
-app.delete("/items/:id", async (req, res) => {
+// Excluir 1
+app.delete("/items/:id", authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id inválido" });
+
     await run(`DELETE FROM items WHERE id = ?`, [id]);
     res.json({ ok: true });
   } catch (e) {
@@ -90,37 +211,41 @@ app.delete("/items/:id", async (req, res) => {
   }
 });
 
-
-app.post("/items/bulk", async (req, res) => {
+// Inserção em lote
+app.post("/items/bulk", authMiddleware, async (req, res) => {
   try {
     const rows = req.body?.rows;
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(400).json({ error: "rows must be a non-empty array" });
+      return res.status(400).json({ error: "rows deve ser um array com pelo menos 1 item" });
     }
 
     const ts = nowIso();
     let inserted = 0;
 
     for (const r of rows) {
-      const title = String(r.title || "").trim();
+      const title = String(r?.title || "").trim();
       if (!title) continue;
 
-      const status = String(r.status || "New").trim();
-      const owner = String(r.owner || "").trim();
+      const status = String(r?.status || "New").trim();
+      const owner = String(r?.owner || "").trim();
 
       await run(
         `INSERT INTO items (title, status, owner, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?)`,
         [title, status, owner, ts, ts]
       );
+
       inserted++;
     }
 
-    res.json({ ok: true, inserted });
+    res.json({ inserted });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`API on http://localhost:${PORT}`));
+/* =========================
+   START
+========================= */
+const PORT = 3001;
+app.listen(PORT, () => console.log(`🚀 API rodando em http://localhost:${PORT}`));
